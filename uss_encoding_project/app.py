@@ -31,7 +31,7 @@ st.set_page_config(page_title="USS Encoding Project", layout="wide")
 st.title("USS Encoding Project")
 
 branches = ["AC", "CHMM", "SMS"]
-branch = st.selectbox("Select Branch to Edit Template", branches)
+branch = st.selectbox("Select Branch", branches)
 
 # --- File uploader UI for daily files ---
 st.markdown("## Upload Daily Files")
@@ -59,7 +59,7 @@ if uploaded_files and len(uploaded_files) == 4:
         st.error("Missing one or more required files. Please check file names.")
     else:
         # Call extraction logic
-        result = extract_data(modifier_file, item_file, discount_file, payment_file)
+        result = extract_data(modifier_file, item_file, discount_file, payment_file, branch)
 
         # Load and fill template
         template_df = load_template(branch)

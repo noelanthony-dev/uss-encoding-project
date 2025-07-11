@@ -1,6 +1,6 @@
 import pandas as pd
 
-def extract_data(modifier_file, item_file, discount_file, payment_file):
+def extract_data(modifier_file, item_file, discount_file, payment_file, branch):
     result = {}
 
     # --- PAYMENT FILE: Extract negative GCash amount ---
@@ -68,6 +68,16 @@ def extract_data(modifier_file, item_file, discount_file, payment_file):
         except:
             pass
 
+    # Handle Special Discount row and map to "special discount"
+    special_match = df_discount[row_names == "special discount"]
+    if not special_match.empty:
+        special_val = special_match[amount_col].values[0]
+        try:
+            special_amount = float(str(special_val).replace(",", ""))
+            result["special discount"] = -special_amount
+        except:
+            pass
+
     # --- ITEM FILE: Extract sold counts from specific items ---
     if item_file.name.endswith(".csv"):
         item_file.seek(0)
@@ -88,6 +98,9 @@ def extract_data(modifier_file, item_file, discount_file, payment_file):
     df_item[item_col] = df_item[item_col].astype(str).str.strip()
     wanted_items = [
         "Combo S1",
+        "Combo S2",
+        "Combo S3",
+        "Sandwich Sampler",
         "Regular - Aloha",
         "Regular - Breakfast",
         "Regular - Chicken Pesto",
@@ -128,11 +141,9 @@ def extract_data(modifier_file, item_file, discount_file, payment_file):
 
     df_mod[mod_option_col] = df_mod[mod_option_col].astype(str).str.strip().str.lower()
     df_mod[mod_name_col] = df_mod[mod_name_col].astype(str).str.strip().str.lower()
-    # DEBUG: print unique option and modifier names
-    print("Modifier file options:", df_mod[mod_option_col].unique())
-    print("Modifier file modifiers:", df_mod[mod_name_col].unique())
 
     def get_qty(option):
+        print(f"Fetching qty for option: {option}")
         match = df_mod[df_mod[mod_option_col] == option.lower()]
         return float(match[qty_col].values[0]) if not match.empty else 0
 
@@ -140,40 +151,77 @@ def extract_data(modifier_file, item_file, discount_file, payment_file):
         match = df_mod[(df_mod[mod_option_col] == option.lower()) & (df_mod[mod_name_col].str.contains(keyword.lower()))]
         return float(match[qty_col].values[0]) if not match.empty else 0
 
-    # Bread
+    # Bread: Only include quantity sold where modifier name contains "Choose your Grain"
     for bread in ["Ciabatta", "Brioche", "Multigrain"]:
-        result[bread.lower()] = get_qty(bread)
+        match = df_mod[
+            (df_mod[mod_option_col] == bread.lower()) &
+            (df_mod[mod_name_col].str.contains("choose your grain"))
+        ]
+        qty = float(match[qty_col].values[0]) if not match.empty else 0
+        result[bread.lower()] = qty
 
-    # Free veggies - match using get_qty with Option Name directly
-    print("---- FREE VEGGIES DEBUG ----")
+    # Free veggies - only include where modifier name contains "Choose your Veggies"
     for veg in ["Cucumber", "Lettuce", "Tomato", "White Onion"]:
-        qty = get_qty(veg)
-        print(f"{veg}: {qty}")
-        if qty:
-            result[veg.lower()] = qty
-    print("---- END FREE VEGGIES DEBUG ----")
+        match = df_mod[
+            (df_mod[mod_option_col] == veg.lower()) &
+            (df_mod[mod_name_col].str.contains("choose your veggies"))
+        ]
+        qty = float(match[qty_col].values[0]) if not match.empty else 0
+        result[veg.lower()] = qty
 
-    # Proteins
-    for meat in ["Bacon", "Beef Salami", "Ham", "Honey Ham", "Italian Chicken", "Chickpeas", "Tuna Flakes"]:
-        result[meat.lower()] = get_qty(meat)
+    # Proteins (only if modifier name contains "Choose your Meat")
+    for meat in ["Bacon", "Beef Salami", "Ham", "Honey Ham", "Italian Chicken", "Tuna Flakes"]:
+        match = df_mod[
+            (df_mod[mod_option_col] == meat.lower()) &
+            (df_mod[mod_name_col].str.contains("choose your meat"))
+        ]
+        qty = float(match[qty_col].values[0]) if not match.empty else 0
+        result[meat.lower()] = qty
 
-    # Cheese
+    # Cheese - only include where modifier name contains "Choose your Cheese"
     for cheese in ["Cheddar", "Mozzarella", "Two Cheese"]:
-        result[cheese.lower()] = get_qty(cheese)
+        match = df_mod[
+            (df_mod[mod_option_col] == cheese.lower()) &
+            (df_mod[mod_name_col].str.contains("choose your cheese"))
+        ]
+        qty = float(match[qty_col].values[0]) if not match.empty else 0
+        result[cheese.lower()] = qty
 
-    # Sauces
-    for sauce in ["Balsamic Vinaigrette", "Cream Cheese & Chive", "Garlic Ranch", "Honey Mustard", "Marinara", "Pesto Cream", "Ultimate Aioli", "Strawberry Jam"]:
-        result[sauce.lower()] = get_qty(sauce)
+    # Sauces (only if modifier name contains "Choose your Spread")
+    for sauce in ["Balsamic Vinaigrette", "Cream Cheese & Chive", "Garlic Ranch", "Honey Mustard", "Pesto Cream", "Ultimate Aioli"]:
+        match = df_mod[
+            (df_mod[mod_option_col] == sauce.lower()) &
+            (df_mod[mod_name_col].str.contains("choose your spread"))
+        ]
+        qty = float(match[qty_col].values[0]) if not match.empty else 0
+        result[sauce.lower()] = qty
 
-    # Eggs (Boiled + Scrambled)
-    egg1 = get_qty("Boileg Egg")
-    egg2 = get_qty("Scrambled Egg")
+    # Add-ons (Eggs, Mushroom, Pickles, Sriracha): only include where modifier name contains "Choose your Add-Ons"
+    egg1 = df_mod[
+        (df_mod[mod_option_col] == "boileg egg") &
+        (df_mod[mod_name_col].str.contains("choose your add-ons"))
+    ][qty_col].sum()
+    egg2 = df_mod[
+        (df_mod[mod_option_col] == "scrambled egg") &
+        (df_mod[mod_name_col].str.contains("choose your add-ons"))
+    ][qty_col].sum()
     result["egg"] = egg1 + egg2
 
-    # Others
-    for opt in ["Mushroom", "Pickles", "Sriracha", "Pineapple"]:
-        result[opt.lower()] = get_qty(opt)
-    result["water"] = get_qty("Water")
+    for opt in ["Mushroom", "Pickles", "Sriracha"]:
+        match = df_mod[
+            (df_mod[mod_option_col] == opt.lower()) &
+            (df_mod[mod_name_col].str.contains("choose your add-ons"))
+        ]
+        qty = float(match[qty_col].values[0]) if not match.empty else 0
+        result[opt.lower()] = qty
+    print(f"Branch selected: {branch}")
+    if branch.lower() == "chmm":
+        print("Branch is CHMM, looking for 'Water CHMM'")
+        print("Modifier options available:", df_mod[mod_option_col].unique())
+        result["water"] = get_qty("Water CHMM")
+        result["water chmm"] = result["water"]
+    else:
+        result["water"] = get_qty("Water")
 
     # Coffee based on option names
     for coffee in [
@@ -184,18 +232,46 @@ def extract_data(modifier_file, item_file, discount_file, payment_file):
         if qty:
             result[coffee.lower()] = qty
 
+    # Smoothies / Detox drinks
+    for drink in ["Golden Boost", "Green Detox", "Pink Glow"]:
+        qty = get_qty_if_contains(drink, "smoothies")
+        if qty:
+            result[drink.lower()] = qty
+
     # Softdrinks
     softdrink_total = get_qty("Coke Regular") + get_qty("Coke Zero") + get_qty("Sprite")
     result["softdrinks"] = softdrink_total
 
-    # Salad-specific sauces
+    # Handle missing spreads (modifier name should include "choose your spread")
+    for spread in ["Marinara", "Strawberry Jam", "Peanut Butter"]:
+        match = df_mod[
+            (df_mod[mod_option_col] == spread.lower()) &
+            (df_mod[mod_name_col].str.contains("choose your spread"))
+        ]
+        qty = float(match[qty_col].values[0]) if not match.empty else 0
+        result[spread.lower()] = qty
+
+    # Handle pineapple under 'Choose your Add-Ons'
+    match = df_mod[
+        (df_mod[mod_option_col] == "pineapple") &
+        (df_mod[mod_name_col].str.contains("choose your add-ons"))
+    ]
+    qty = float(match[qty_col].values[0]) if not match.empty else 0
+    result["pineapple"] = qty
+
+    # Salad-specific sauces (sum all quantities where modifier name contains 'salad')
     for salad_sauce in ["Balsamic Vinaigrette", "Garlic Ranch", "Honey Mustard"]:
-        qty = get_qty_if_contains(salad_sauce, "salad")
+        mask = (
+            (df_mod[mod_option_col] == salad_sauce.lower()) &
+            (df_mod[mod_name_col].str.contains("salad"))
+        )
+        qty = df_mod.loc[mask, qty_col].sum()
         if qty:
             result[f"salad - {salad_sauce.lower()}"] = qty
 
-    print("FINAL RESULT KEYS:", result.keys())
-    print("FINAL RESULT VALUES:", result)
+    print("DEBUG: Final water value →", result.get("water"))
+    print("DEBUG: All option names containing 'water':")
+    print(df_mod[df_mod[mod_option_col].str.contains("water")][[mod_option_col, qty_col]])
     return result
 
     # --- MODIFIER FILE: Special Salad Garlic Ranch logic ---
