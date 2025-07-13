@@ -82,6 +82,9 @@ st.markdown("---")
 
 # Load template
 df = load_template(branch)
+# Add position column if it doesn't exist
+if "Position" not in df.columns:
+    df.insert(0, "Position", range(1, len(df) + 1))
 
 st.subheader(f"Editing Template for Branch: {branch}")
 
@@ -89,9 +92,16 @@ edited_df = st.data_editor(
     df,
     use_container_width=True,
     num_rows="dynamic",
-    column_config={"Item": "Item Name", "Value": "Default Value"}
+    column_config={
+        "Item": "Item Name",
+        "Value": "Default Value",
+        "Position": st.column_config.NumberColumn("Position", min_value=1, step=1)
+    }
 )
 
 
 if st.button("Save Changes"):
-    save_template(branch, edited_df)
+    # Sort first by current Position then reassign new unique positions
+    edited_df_sorted = edited_df.sort_values("Position").reset_index(drop=True)
+    edited_df_sorted["Position"] = range(1, len(edited_df_sorted) + 1)
+    save_template(branch, edited_df_sorted)
