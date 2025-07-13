@@ -42,8 +42,8 @@ uploaded_files = st.file_uploader(
 )
 
 # Check all files uploaded and placeholder for processing logic
-if uploaded_files and len(uploaded_files) == 4:
-    st.success("All 4 files uploaded successfully!")
+if uploaded_files and len(uploaded_files) >= 1:
+    st.success("Files uploaded successfully!")
 
     import io
     from logic.extract import extract_data
@@ -55,8 +55,8 @@ if uploaded_files and len(uploaded_files) == 4:
     discount_file = next((f for name, f in file_dict.items() if name.startswith("discounts-")), None)
     payment_file = next((f for name, f in file_dict.items() if name.startswith("payment-type-sales-")), None)
 
-    if not all([modifier_file, item_file, discount_file, payment_file]):
-        st.error("Missing one or more required files. Please check file names.")
+    if not modifier_file and not item_file and not discount_file and not payment_file:
+        st.error("No recognizable files uploaded. Please check file names.")
     else:
         # Call extraction logic
         result = extract_data(modifier_file, item_file, discount_file, payment_file, branch)
@@ -77,8 +77,6 @@ if uploaded_files and len(uploaded_files) == 4:
             )
         else:
             st.warning("Template for selected branch is empty or could not be loaded.")
-else:
-    st.warning("Please upload exactly 4 .xlsx files to proceed.")
 
 st.markdown("---")
 
