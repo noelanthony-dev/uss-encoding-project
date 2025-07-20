@@ -1,0 +1,35 @@
+# macOS system files
+.DS_Store
+
+# Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.env/
+.venv/
+env/
+venv/
+ENV/
+*.env
+
+# Jupyter Notebook checkpoints (if using)
+.ipynb_checkpoints/
+
+# VSCode or other editor config folders
+.vscode/
+.idea/
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Excel templates (optional: remove this if templates should be versioned)
+# Uncomment below if you want to ignore Excel files
+# *.xlsx
+
+# System-specific files
+Thumbs.db
+desktop.ini
